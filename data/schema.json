@@ -1,0 +1,25 @@
+{
+  "paper_rows": 8400,
+  "sampling_interval_hours": 2,
+  "date_column": "date",
+  "target_dimension": 89,
+  "files": {
+    "dx_input": {
+      "name": "dam_2h_saits_dx_only_nomask.csv",
+      "columns": "date + 89 continuous dx channels"
+    },
+    "engineered_input": {
+      "name": "dam_2h_saits_dx_engineered_env_nomask.csv",
+      "columns": "date + the same ordered 89 dx channels + engineered ENV features"
+    },
+    "target": {
+      "name": "filtered_response.csv",
+      "columns": "date + the same ordered 89 dx channels"
+    },
+    "mask": {
+      "name": "dam_2h_filtered_response_observed_mask.csv",
+      "columns": "date + one <dx_channel>_masked column per target",
+      "semantics": {"0": "originally observed and trusted", "1": "missing/repaired and excluded"}
+    }
+  }
+}

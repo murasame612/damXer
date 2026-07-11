@@ -1,0 +1,46 @@
+{
+  "data_protocol": {
+    "sampling_interval_hours": 2,
+    "date_start": "2024-01-01 00:00:00",
+    "date_end": "2025-11-30 22:00:00",
+    "timestamps": 8400,
+    "split": [0.7, 0.1, 0.2],
+    "split_rows": [5880, 840, 1680],
+    "split_windows": [5065, 745, 1585],
+    "target_channels": 89,
+    "observed_only_supervision": true
+  },
+  "model": {
+    "dx_seq_len": 192,
+    "env_seq_len": 720,
+    "pred_len": 96,
+    "patch_len": 16,
+    "patch_stride": 16,
+    "hidden": 160,
+    "n_heads": 8,
+    "e_layers": 2,
+    "ffn_dim": 640,
+    "dropout": 0.2,
+    "env_token_count": 60,
+    "env_token_mode": "lag",
+    "predict_mode": "direct",
+    "revin": true,
+    "revin_eps": 1e-5,
+    "zero_head_init": true,
+    "channel_attention": false
+  },
+  "optimization": {
+    "optimizer": "AdamW",
+    "batch_size": 8,
+    "learning_rate": 0.0001327691239087578,
+    "weight_decay": 0.00014163979315531797,
+    "gradient_clip_norm": 1.0,
+    "loss": "Huber",
+    "huber_delta": 0.2,
+    "epochs": 30,
+    "patience": 6,
+    "min_delta": 1e-5,
+    "seeds": [2021, 2022, 2023, 2024, 2025],
+    "selection_metric": "validation observed MSE"
+  }
+}

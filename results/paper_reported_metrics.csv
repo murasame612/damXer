@@ -1,0 +1,4 @@
+setting,seeds,test_observed_mse_mean,test_observed_mse_std,test_observed_rmse
+DamXer full,5,0.178325,0.006758,0.4223
+DamXer w/o lag ENV,5,0.194601,0.007207,0.4411
+DamXer w/o ENV,5,0.196716,0.004310,0.4435
