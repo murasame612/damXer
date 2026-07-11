@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "title": "DamXer processed forecasting benchmark",
+    "upload_type": "dataset",
+    "description": "Site-anonymized processed inputs, filtered structural-response targets, and original observation masks used by the frozen DamXer forecasting protocol. This release is a processed forecasting benchmark and does not contain the complete source monitoring archive.",
+    "creators": [
+      {
+        "name": "TODO: Family name, Given names",
+        "affiliation": "TODO: affiliation"
+      }
+    ],
+    "keywords": [
+      "dam safety monitoring",
+      "time-series forecasting",
+      "incomplete monitoring",
+      "environmental lag attention",
+      "structural response"
+    ],
+    "access_right": "restricted",
+    "access_conditions": "Files are available to editors and peer reviewers through a private review link during peer review. Public release is planned after manuscript acceptance, subject to the documented data-owner approval.",
+    "prereserve_doi": true
+  }
+}

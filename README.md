@@ -11,11 +11,15 @@ paths, and exploratory experiments are not published accidentally.
 
 ## Release status
 
-This is currently a **private code-only staging repository**. The real
-dam-monitoring data are not committed here. Without the paper dataset, third
-parties can inspect the method and execute the synthetic smoke test, but cannot
-reproduce the paper's numerical results. The final data-access statement will
-be documented in the associated paper before this repository is made public.
+This is the public code release for the DamXer method and reproducible
+experiment pipeline. The real dam-monitoring data are not committed here.
+Without the paper dataset, third parties can inspect the method and execute the
+synthetic smoke test, but cannot reproduce the paper's numerical results.
+
+The processed benchmark is intended for a separate restricted Zenodo record,
+with reviewer access during peer review and public release only after written
+data-owner approval. See [release/README.md](release/README.md) for the
+fail-closed validation and upload workflow.
 
 ## What is included
 
@@ -156,6 +160,7 @@ input and does not redistribute the project-specific completion dataset.
 
 ## License and citation
 
-A source-code license and final citation metadata will be added after the
-authors confirm institutional intellectual-property requirements and the final
-paper author list, before the repository is made public.
+The source code, configurations, documentation, and synthetic examples are
+released under the [MIT License](LICENSE). The MIT License does not grant any
+rights to operational monitoring data, which remain governed separately by the
+data owner. Citation metadata are provided in [CITATION.cff](CITATION.cff).

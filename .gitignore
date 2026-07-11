@@ -47,3 +47,9 @@ external/
 *.db
 *.sqlite*
 *.log
+
+# Local data-release staging. Real monitoring data and upload archives must
+# never be committed to the code repository.
+release/staging/
+release/*.zip
+release/*.tar.gz

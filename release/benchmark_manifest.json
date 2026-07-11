@@ -1,0 +1,60 @@
+{
+  "dataset_name": "DamXer processed forecasting benchmark",
+  "version": "1.0.0",
+  "release_status": "pending_data_owner_approval",
+  "scope": "Processed inputs, target, and observation mask for the frozen forecasting experiment; not the complete 289-variable source archive.",
+  "sampling_interval_hours": 2,
+  "rows": 8400,
+  "date_start": "2024-01-01 00:00:00",
+  "date_end": "2025-11-30 22:00:00",
+  "target_channels": 89,
+  "engineered_environment_features": 79,
+  "mask_semantics": {
+    "0": "originally observed and trusted target cell",
+    "1": "missing or repaired target cell excluded from loss and metrics"
+  },
+  "chronological_split": {
+    "train_fraction": 0.7,
+    "validation_fraction": 0.1,
+    "test_fraction": 0.2,
+    "prediction_origins_after_windowing": {
+      "train": 5065,
+      "validation": 745,
+      "test": 1585
+    }
+  },
+  "files": [
+    {
+      "role": "dx_input",
+      "source_name": "dam_2h_saits_dx_only_nomask.csv",
+      "archive_path": "inputs/dam_2h_saits_dx_only_nomask.csv",
+      "columns": 90,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "role": "engineered_input",
+      "source_name": "dam_2h_saits_dx_engineered_env_nomask.csv",
+      "archive_path": "inputs/dam_2h_saits_dx_engineered_env_nomask.csv",
+      "columns": 169,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "role": "filtered_target",
+      "source_name": "filtered_response.csv",
+      "archive_path": "targets/filtered_response.csv",
+      "columns": 90,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "role": "observed_mask",
+      "source_name": "dam_2h_filtered_response_observed_mask.csv",
+      "archive_path": "targets/dam_2h_filtered_response_observed_mask.csv",
+      "columns": 90,
+      "bytes": null,
+      "sha256": null
+    }
+  ]
+}
