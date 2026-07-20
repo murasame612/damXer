@@ -110,6 +110,16 @@ def main() -> None:
     parser.add_argument("--raw-time-col", default="采集时间")
     parser.add_argument("--date-col", default="date")
     parser.add_argument("--target-prefix", default="dx")
+    parser.add_argument(
+        "--date-start",
+        default="",
+        help="Optional inclusive timestamp bound applied after raw/clean alignment.",
+    )
+    parser.add_argument(
+        "--date-end",
+        default="",
+        help="Optional exclusive timestamp bound applied after raw/clean alignment.",
+    )
     parser.add_argument("--method", choices=["sg", "butter", "median_sg", "none"], default="median_sg")
     parser.add_argument("--step-hours", type=float, default=2.0)
     parser.add_argument("--sg-window", type=int, default=9, help="Samples. 9 at 2h equals 18h.")
@@ -128,6 +138,19 @@ def main() -> None:
     clean = load_frame(clean_path, args.raw_time_col, args.date_col)
     if raw["date"].astype(str).tolist() != clean["date"].astype(str).tolist():
         raise ValueError("raw and SAITS-clean date columns differ")
+    aligned_dates = raw["date"].astype(str).tolist()
+
+    input_rows = len(raw)
+    dates = pd.to_datetime(raw["date"], errors="raise")
+    keep = pd.Series(True, index=raw.index)
+    if args.date_start:
+        keep &= dates >= pd.Timestamp(args.date_start)
+    if args.date_end:
+        keep &= dates < pd.Timestamp(args.date_end)
+    if not keep.any():
+        raise ValueError(
+            f"date window [{args.date_start!r}, {args.date_end!r}) selected no rows"
+        )
 
     raw_value_cols = [col for col in raw.columns if col != "date"]
     clean_value_cols = [col for col in clean.columns if col != "date"]
@@ -156,7 +179,6 @@ def main() -> None:
     filtered = pd.DataFrame(index=raw.index)
     residual = pd.DataFrame(index=raw.index)
     observed_mask = pd.DataFrame({"date": raw["date"].astype(str)})
-    channel_summary: list[dict[str, Any]] = []
 
     for idx, col in enumerate(target_cols, start=1):
         clean_values = target_clean[col].to_numpy(dtype=np.float64)
@@ -180,6 +202,23 @@ def main() -> None:
         residual[col] = np.where(observed, raw_values - fitted, np.nan)
         observed_mask[f"{col}_masked"] = (~observed).astype("int8")
 
+        aexp_progress("channel", idx, total=len(target_cols), column=col)
+
+    # Filtering is intentionally applied before the paper-date slice. The
+    # bilateral target constructor therefore retains the same surrounding
+    # context as the source experiment, including the final six target rows.
+    raw = raw.loc[keep].reset_index(drop=True)
+    clean = clean.loc[keep].reset_index(drop=True)
+    target_raw = target_raw.loc[keep].reset_index(drop=True)
+    target_clean = target_clean.loc[keep].reset_index(drop=True)
+    filtered = filtered.loc[keep].reset_index(drop=True)
+    residual = residual.loc[keep].reset_index(drop=True)
+    observed_mask = observed_mask.loc[keep].reset_index(drop=True)
+
+    channel_summary: list[dict[str, Any]] = []
+    for col in target_cols:
+        raw_values = target_raw[col].to_numpy(dtype=np.float64)
+        observed = np.isfinite(raw_values)
         obs_res = residual[col].dropna().to_numpy(dtype=np.float64)
         raw_obs = raw_values[observed]
         channel_summary.append(
@@ -192,7 +231,6 @@ def main() -> None:
                 "raw_std_observed": float(np.nanstd(raw_obs)) if raw_obs.size else None,
             }
         )
-        aexp_progress("channel", idx, total=len(target_cols), column=col)
 
     mask_values = observed_mask.drop(columns=["date"]).to_numpy(dtype=np.float32)
     observed_values = 1.0 - mask_values
@@ -217,8 +255,9 @@ def main() -> None:
     if args.engineered_env_csv:
         engineered_source = Path(args.engineered_env_csv)
         engineered = load_frame(engineered_source, args.raw_time_col, args.date_col)
-        if raw["date"].astype(str).tolist() != engineered["date"].astype(str).tolist():
+        if aligned_dates != engineered["date"].astype(str).tolist():
             raise ValueError("raw and engineered-env date columns differ")
+        engineered = engineered.loc[keep].reset_index(drop=True)
         engineered_value_cols = [col for col in engineered.columns if col != "date"]
         if len(engineered_value_cols) <= len(target_cols):
             raise ValueError("engineered-env CSV has no auxiliary columns after target_dim")
@@ -243,6 +282,14 @@ def main() -> None:
         "engineered_env_csv": str(Path(args.engineered_env_csv).resolve()) if args.engineered_env_csv else None,
         "output_dir": str(output_dir.resolve()),
         "date_column": "date",
+        "date_window": {
+            "start_inclusive": args.date_start or None,
+            "end_exclusive": args.date_end or None,
+            "first_date": str(raw["date"].iloc[0]),
+            "last_date": str(raw["date"].iloc[-1]),
+            "input_rows": int(input_rows),
+            "selected_rows": int(len(raw)),
+        },
         "target_prefix": args.target_prefix,
         "target_columns": target_cols,
         "target_dim": len(target_cols),

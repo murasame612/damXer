@@ -51,6 +51,24 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
+def resolve_device(requested: str, gpu: int) -> torch.device:
+    if requested == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("--device cuda requested but CUDA is unavailable")
+        return torch.device(f"cuda:{gpu}")
+    if requested == "mps":
+        if not torch.backends.mps.is_available():
+            raise RuntimeError("--device mps requested but MPS is unavailable")
+        return torch.device("mps")
+    if requested == "cpu":
+        return torch.device("cpu")
+    if torch.cuda.is_available():
+        return torch.device(f"cuda:{gpu}")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def _parse_date_bound(value: str, *, is_end: bool) -> pd.Timestamp | None:
     value = value.strip()
     if not value:
@@ -937,6 +955,12 @@ def main():
     parser.add_argument("--revin", action="store_true")
     parser.add_argument("--revin-eps", type=float, default=1e-5)
     parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
+    parser.add_argument(
+        "--evaluation-schedule",
+        choices=["per_epoch_test", "final_only"],
+        default="final_only",
+    )
     parser.add_argument("--seed", type=int, default=2021)
     parser.add_argument("--trial-name", default="damxer")
     parser.add_argument("--event-trial", type=int, default=-1)
@@ -1008,6 +1032,7 @@ def main():
         "zero_head_init",
         "revin",
         "revin_eps",
+        "evaluation_schedule",
         "seed",
         "trial_name",
         "date_start",
@@ -1047,7 +1072,7 @@ def main():
             f"first={date_filter['first_date']} last={date_filter['last_date']}"
         )
     train_ds, val_ds, test_ds, loaders = make_loaders(dx_df, eng_df, mask_df, args, target_df)
-    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(args.device, args.gpu)
     model = DamLagXer(
         target_dim=args.target_dim,
         env_cols=train_ds.env_cols,
@@ -1092,6 +1117,7 @@ def main():
         "variant": f"dx{args.dx_seq_len}_env{args.env_seq_len}_pl{args.pred_len}",
         "trial_name": args.trial_name,
         "seed": args.seed,
+        "device": str(device),
     }
     if args.event_trial >= 0:
         fields["trial"] = args.event_trial
@@ -1155,6 +1181,11 @@ def main():
         train_trend_loss = float(np.mean(trend_losses))
         train_residual_loss = float(np.mean(residual_losses))
         val_metrics = run_eval(model, loaders["val"], device, args.predict_mode, args.revin, args.revin_eps)
+        test_metrics = (
+            run_eval(model, loaders["test"], device, args.predict_mode, args.revin, args.revin_eps)
+            if args.evaluation_schedule == "per_epoch_test"
+            else None
+        )
         selection_score = validation_selection_score(val_metrics, args)
         aexp_progress("epoch", epoch, total=args.epochs, stage="train", **fields)
         aexp_metric("train/loss", train_loss, step=epoch, epoch=epoch, stage="train", **fields)
@@ -1170,13 +1201,22 @@ def main():
         if args.residual_lambda > 0:
             aexp_metric("train/residual_loss", train_residual_loss, step=epoch, epoch=epoch, stage="train", **fields)
         aexp_metric("val/observed_mse", val_metrics["mse"], step=epoch, epoch=epoch, split="val", stage="eval", **fields)
+        if test_metrics is not None:
+            aexp_metric("test/observed_mse", test_metrics["mse"], step=epoch, epoch=epoch, split="test", stage="eval", **fields)
         for key in ("diff_mse", "diff_abs_ratio", "diff_energy_ratio", "peak_diff_mse", "peak_diff_abs_ratio", "curvature_mse", "curvature_energy_ratio"):
             if val_metrics.get(key) is not None:
                 aexp_metric(f"val/{key}", val_metrics[key], step=epoch, epoch=epoch, split="val", stage="eval", **fields)
+            if test_metrics is not None and test_metrics.get(key) is not None:
+                aexp_metric(f"test/{key}", test_metrics[key], step=epoch, epoch=epoch, split="test", stage="eval", **fields)
         aexp_metric("val/selection_score", selection_score, step=epoch, epoch=epoch, split="val", stage="eval", **fields)
-        print(
+        line = (
             f"epoch={epoch} train={train_loss:.6f} val={val_metrics['mse']:.6f} "
-            f"val_diff_ratio={val_metrics.get('diff_abs_ratio')} selection={selection_score:.6f}",
+        )
+        if test_metrics is not None:
+            line += f"test={test_metrics['mse']:.6f} "
+        line += f"val_diff_ratio={val_metrics.get('diff_abs_ratio')} selection={selection_score:.6f}"
+        print(
+            line,
             flush=True,
         )
         if selection_score + args.min_delta < best["score"]:
@@ -1185,7 +1225,7 @@ def main():
                 "epoch": epoch,
                 "state": copy.deepcopy(model.state_dict()),
                 "val_metrics": val_metrics,
-                "test_metrics": None,
+                "test_metrics": test_metrics,
             }
             bad = 0
         else:
@@ -1196,8 +1236,9 @@ def main():
     if best["state"] is None:
         raise RuntimeError("training finished without a validation-selected model state")
     model.load_state_dict(best["state"])
-    best["val_metrics"] = run_eval(model, loaders["val"], device, args.predict_mode, args.revin, args.revin_eps)
-    best["test_metrics"] = run_eval(model, loaders["test"], device, args.predict_mode, args.revin, args.revin_eps)
+    if args.evaluation_schedule == "final_only":
+        best["val_metrics"] = run_eval(model, loaders["val"], device, args.predict_mode, args.revin, args.revin_eps)
+        best["test_metrics"] = run_eval(model, loaders["test"], device, args.predict_mode, args.revin, args.revin_eps)
     attention_summary = collect_attention_summary(model, loaders["val"], device)
     sensitivity = collect_lag_sensitivity(model, loaders, device, args, args.sensitivity_specs) if args.sensitivity_specs else None
     prediction_npz = None
@@ -1282,6 +1323,8 @@ def main():
         "revin": args.revin,
         "revin_eps": args.revin_eps,
         "seed": args.seed,
+        "device": str(device),
+        "evaluation_schedule": args.evaluation_schedule,
         "trial_name": args.trial_name,
         "date_filter": date_filter,
         "best_epoch": best["epoch"],

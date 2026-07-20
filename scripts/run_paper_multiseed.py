@@ -13,10 +13,17 @@ from pathlib import Path
 
 import pandas as pd
 
+from paper_protocol import (
+    DEFAULT_CONFIG,
+    assert_canonical_hashes,
+    file_record,
+    git_provenance,
+    load_config,
+    require_clean_git,
+    runtime_versions,
+    sha256_file,
+)
 from train_damxer import build_token_specs
-
-
-PAPER_SEEDS = (2021, 2022, 2023, 2024, 2025)
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,22 +32,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-csv", required=True)
     parser.add_argument("--mask-csv", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument("--dx-variant", default="dam_2h_saits_dx_only_nomask.csv")
     parser.add_argument("--engineered-variant", default="dam_2h_saits_dx_engineered_env_nomask.csv")
     parser.add_argument("--variant", choices=["full", "no_lag_env", "no_env"], default="full")
-    parser.add_argument("--seeds", default=",".join(map(str, PAPER_SEEDS)))
+    parser.add_argument("--seeds", default="")
     parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
     parser.add_argument("--num-workers", type=int, default=0)
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--patience", type=int, default=6)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--patience", type=int, default=None)
     parser.add_argument("--date-start", default="")
     parser.add_argument("--date-end", default="")
     parser.add_argument("--check-only", action="store_true")
     parser.add_argument("--strict-paper-shape", action="store_true")
+    parser.add_argument("--allow-dirty-code", action="store_true")
     return parser.parse_args()
 
 
-def load_and_validate(args: argparse.Namespace) -> dict:
+def load_and_validate(args: argparse.Namespace, config: dict) -> dict:
     data_root = Path(args.data_root)
     paths = {
         "dx": data_root / args.dx_variant,
@@ -92,17 +102,32 @@ def load_and_validate(args: argparse.Namespace) -> dict:
         "lag_token_count": token_count,
         "split_rows": {"train": n_train, "val": n_val, "test": n_test},
         "split_windows": split_windows,
+        "files": {name: file_record(path) for name, path in paths.items()},
     }
     if args.strict_paper_shape:
+        protocol = config["data_protocol"]
         expected = {
-            "rows": 8400,
-            "target_dim": 89,
-            "lag_token_count": 60,
-            "split_windows": {"train": 5065, "val": 745, "test": 1585},
+            "rows": protocol["timestamps"],
+            "first_date": protocol["date_start"],
+            "last_date": protocol["date_end"],
+            "target_dim": protocol["target_channels"],
+            "engineered_feature_count": protocol["engineered_environment_features"],
+            "lag_token_count": config["damxer"]["env_token_count"],
+            "split_windows": dict(zip(("train", "val", "test"), protocol["damxer_split_windows"])),
         }
         mismatches = {key: (report[key], value) for key, value in expected.items() if report[key] != value}
         if mismatches:
             raise ValueError(f"inputs do not match the paper protocol: {mismatches}")
+        hashes = protocol["canonical_sha256"]
+        assert_canonical_hashes(
+            report["files"],
+            {
+                "dx": hashes["dx_input"],
+                "engineered": hashes["engineered_input"],
+                "target": hashes["target"],
+                "mask": hashes["mask"],
+            },
+        )
     return report
 
 
@@ -116,12 +141,20 @@ def summarize(values: list[float]) -> dict:
 
 def main() -> None:
     args = parse_args()
-    protocol = load_and_validate(args)
+    config_path, config = load_config(args.config)
+    protocol = load_and_validate(args, config)
+    code_provenance = git_provenance(Path(__file__).resolve().parents[1])
+    if not args.allow_dirty_code:
+        require_clean_git(code_provenance, "DamXer repository")
+    protocol["code_provenance"] = code_provenance
+    protocol["config"] = {"path": str(config_path), "sha256": sha256_file(config_path)}
     if args.check_only:
         print(json.dumps(protocol, indent=2))
         return
 
-    seeds = [int(item) for item in args.seeds.replace(" ", ",").split(",") if item]
+    seeds = [int(item) for item in args.seeds.replace(" ", ",").split(",") if item] or [
+        int(value) for value in config["optimization"]["seeds"]
+    ]
     if not seeds:
         raise ValueError("--seeds must contain at least one integer")
     output_dir = Path(args.output_dir)
@@ -132,6 +165,10 @@ def main() -> None:
 
     env_mode = "none" if args.variant == "no_env" else "full"
     env_token_mode = "no_lag" if args.variant == "no_lag_env" else "lag"
+    model_config = config["damxer"]
+    optimization = config["optimization"]
+    epochs = args.epochs if args.epochs is not None else int(optimization["epochs"])
+    patience = args.patience if args.patience is not None else int(optimization["patience"])
     train_script = Path(__file__).with_name("train_damxer.py")
     rows = []
     for seed in seeds:
@@ -146,32 +183,34 @@ def main() -> None:
             "--target-csv", args.target_csv,
             "--mask-csv", args.mask_csv,
             "--output", str(result_path),
-            "--dx-seq-len", "192",
-            "--env-seq-len", "720",
-            "--pred-len", "96",
-            "--target-dim", "89",
-            "--patch-len", "16",
-            "--patch-stride", "16",
-            "--hidden", "160",
-            "--n-heads", "8",
-            "--e-layers", "2",
-            "--dropout", "0.2",
-            "--epochs", str(args.epochs),
-            "--patience", str(args.patience),
-            "--min-delta", "1e-5",
-            "--batch-size", "8",
+            "--dx-seq-len", str(model_config["dx_seq_len"]),
+            "--env-seq-len", str(model_config["env_seq_len"]),
+            "--pred-len", str(model_config["pred_len"]),
+            "--target-dim", str(config["data_protocol"]["target_channels"]),
+            "--patch-len", str(model_config["patch_len"]),
+            "--patch-stride", str(model_config["patch_stride"]),
+            "--hidden", str(model_config["hidden"]),
+            "--n-heads", str(model_config["n_heads"]),
+            "--e-layers", str(model_config["e_layers"]),
+            "--dropout", str(model_config["dropout"]),
+            "--epochs", str(epochs),
+            "--patience", str(patience),
+            "--min-delta", str(optimization["min_delta"]),
+            "--batch-size", str(optimization["batch_size"]),
             "--num-workers", str(args.num_workers),
-            "--lr", "0.0001327691239087578",
-            "--weight-decay", "0.00014163979315531797",
+            "--lr", str(optimization["learning_rate"]),
+            "--weight-decay", str(optimization["weight_decay"]),
             "--loss-type", "huber",
-            "--huber-delta", "0.2",
-            "--predict-mode", "direct",
+            "--huber-delta", str(optimization["huber_delta"]),
+            "--predict-mode", model_config["predict_mode"],
             "--env-mode", env_mode,
             "--env-token-mode", env_token_mode,
             "--zero-head-init",
             "--revin",
-            "--revin-eps", "1e-5",
+            "--revin-eps", str(model_config["revin_eps"]),
             "--gpu", str(args.gpu),
+            "--device", args.device,
+            "--evaluation-schedule", config["source_compatibility"]["evaluation_schedule"],
             "--seed", str(seed),
             "--trial-name", f"paper_{args.variant}_seed{seed}",
         ]
@@ -207,7 +246,13 @@ def main() -> None:
         writer.writerows(rows)
     summary = {
         "experiment": f"DamXer paper configuration: {args.variant}",
-        "selection": "validation observed MSE; test evaluated after restoring the validation-best model state",
+        "config": {"path": str(config_path), "sha256": sha256_file(config_path)},
+        "code_provenance": code_provenance,
+        "runtime": runtime_versions(),
+        "selection": (
+            "validation observed MSE; source-compatible schedule evaluates the test loader each epoch "
+            "and reports the test metrics paired with the validation-best epoch"
+        ),
         "protocol": protocol,
         "seeds": seeds,
         "aggregates": {

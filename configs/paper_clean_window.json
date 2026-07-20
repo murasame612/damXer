@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "data_protocol": {
     "sampling_interval_hours": 2,
     "date_start": "2024-01-01 00:00:00",
@@ -6,11 +7,29 @@
     "timestamps": 8400,
     "split": [0.7, 0.1, 0.2],
     "split_rows": [5880, 840, 1680],
-    "split_windows": [5065, 745, 1585],
+    "damxer_split_windows": [5065, 745, 1585],
+    "dx_only_split_windows": [5593, 745, 1585],
     "target_channels": 89,
-    "observed_only_supervision": true
+    "raw_environment_channels": 111,
+    "raw_env_input_channels": 200,
+    "engineered_environment_features": 79,
+    "observed_only_supervision": true,
+    "files": {
+      "dx_input": "dam_2h_saits_dx_only_nomask.csv",
+      "engineered_input": "dam_2h_saits_dx_engineered_env_nomask.csv",
+      "raw_env_input": "dam_2h_saits_dx_raw_env_nomask.csv",
+      "target": "filtered_response.csv",
+      "mask": "dam_2h_filtered_response_observed_mask.csv"
+    },
+    "canonical_sha256": {
+      "dx_input": "b856a77162c33d1280e514f3fb08b8f13a36fc6acc1ffcccbb063cf3f92b4a81",
+      "engineered_input": "530f2ac80c26e4bd27fde2f7e0d68f0104536c91ffc6a8fe54faf662f4f4a898",
+      "raw_env_input": "44ede57a6315ea5488509f3975e646877fabd930c5cc6a2985cc387bf154d744",
+      "target": "c8a3a09f7e1559d20c874b7365cb3d28850ce17ff06e113889c47a034a1fc609",
+      "mask": "435a508da4909ff694b5f33e1957cbc9bd12f3160c8e466836d7f68d6e93f3fd"
+    }
   },
-  "model": {
+  "damxer": {
     "dx_seq_len": 192,
     "env_seq_len": 720,
     "pred_len": 96,
@@ -22,6 +41,7 @@
     "ffn_dim": 640,
     "dropout": 0.2,
     "env_token_count": 60,
+    "reduced_env_token_count": 15,
     "env_token_mode": "lag",
     "predict_mode": "direct",
     "revin": true,
@@ -42,5 +62,58 @@
     "min_delta": 1e-5,
     "seeds": [2021, 2022, 2023, 2024, 2025],
     "selection_metric": "validation observed MSE"
+  },
+  "source_compatibility": {
+    "evaluation_schedule": "per_epoch_test",
+    "reason": "The source runs evaluated the test loader each epoch and stored the test metrics from the validation-best epoch. Test metrics did not enter model selection, but loader iteration changes the subsequent RNG stream; retaining this schedule is required to reproduce the reported seeds."
+  },
+  "tslib": {
+    "repository": "https://github.com/thuml/Time-Series-Library.git",
+    "required_commit": "4e938a1767106324dd753b2a44832bf870a0252e",
+    "commit_provenance": "reconstructed pin: official upstream HEAD predates the source runs, but the original run did not record its Time-Series-Library commit",
+    "common": {
+      "pred_len": 96,
+      "target_dim": 89,
+      "epochs": 30,
+      "patience": 6,
+      "batch_size": 16,
+      "learning_rate": 0.0005,
+      "d_model": 64,
+      "d_ff": 128,
+      "n_heads": 2,
+      "e_layers": 1,
+      "dropout": 0.1,
+      "patch_len": 16,
+      "patch_stride": 8,
+      "train_loss_mode": "observed",
+      "selection_metric": "observed"
+    },
+    "profiles": {
+      "dx_only": {
+        "models": ["PatchTST", "iTransformer", "DLinear", "TimesNet", "FEDformer"],
+        "input_file": "dam_2h_saits_dx_only_nomask.csv",
+        "seq_len": 192,
+        "input_channels": 89,
+        "label_len": {"FEDformer": 96, "default": 0}
+      },
+      "raw_env": {
+        "models": ["iTransformer"],
+        "input_file": "dam_2h_saits_dx_raw_env_nomask.csv",
+        "seq_len": 720,
+        "input_channels": 200,
+        "label_len": {"default": 0}
+      }
+    }
+  },
+  "expected_metrics": {
+    "DamXer": {"val_mse_mean": 0.137507916103, "val_mse_std": 0.001556970209, "test_mse_mean": 0.178324743582, "test_mse_std": 0.006757590851},
+    "DamXer reduced-lag ENV": {"val_mse_mean": 0.136374329622, "val_mse_std": 0.001584522621, "test_mse_mean": 0.194600832651, "test_mse_std": 0.007206406801},
+    "DamXer displacement only": {"val_mse_mean": 0.137507264972, "val_mse_std": 0.000209558635, "test_mse_mean": 0.196716058629, "test_mse_std": 0.004310044674},
+    "PatchTST": {"val_mse_mean": 0.128556853533, "val_mse_std": 0.001315372452, "test_mse_mean": 0.194172152877, "test_mse_std": 0.004609404543},
+    "iTransformer (dx only)": {"val_mse_mean": 0.138195684552, "val_mse_std": 0.000990507006, "test_mse_mean": 0.204762735963, "test_mse_std": 0.003854824569},
+    "iTransformer+raw ENV (720)": {"val_mse_mean": 0.134338907956, "val_mse_std": 0.005065363410, "test_mse_mean": 0.263851156986, "test_mse_std": 0.023453731915},
+    "DLinear": {"val_mse_mean": 0.146367561817, "val_mse_std": 0.002025845259, "test_mse_mean": 0.290825617313, "test_mse_std": 0.010514318716},
+    "TimesNet": {"val_mse_mean": 0.200812184811, "val_mse_std": 0.010755172614, "test_mse_mean": 0.489089173079, "test_mse_std": 0.067144209283},
+    "FEDformer": {"val_mse_mean": 0.216984030604, "val_mse_std": 0.007908124851, "test_mse_mean": 0.590683293343, "test_mse_std": 0.018452323256}
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build no-mask dx-only and engineered-env inputs for 2h iTransformer runs.
+"""Build the three input tables used by the DamXer paper experiments.
 
 The output CSVs are model inputs only. Original target missingness is written to
 a separate mask CSV for observed-only loss/metrics and is never appended as an
@@ -158,6 +158,16 @@ def main() -> None:
     parser.add_argument("--date-col", default="date")
     parser.add_argument("--target-prefix", default="dx")
     parser.add_argument(
+        "--date-start",
+        default="",
+        help="Optional inclusive timestamp bound applied after raw/clean alignment.",
+    )
+    parser.add_argument(
+        "--date-end",
+        default="",
+        help="Optional exclusive timestamp bound applied after raw/clean alignment.",
+    )
+    parser.add_argument(
         "--feature-profile",
         choices=["base", "rich"],
         default="base",
@@ -175,6 +185,20 @@ def main() -> None:
     if raw["date"].astype(str).tolist() != clean["date"].astype(str).tolist():
         raise ValueError("raw and SAITS clean date columns differ")
 
+    input_rows = len(raw)
+    dates = pd.to_datetime(raw["date"], errors="raise")
+    keep = pd.Series(True, index=raw.index)
+    if args.date_start:
+        keep &= dates >= pd.Timestamp(args.date_start)
+    if args.date_end:
+        keep &= dates < pd.Timestamp(args.date_end)
+    raw = raw.loc[keep].reset_index(drop=True)
+    clean = clean.loc[keep].reset_index(drop=True)
+    if raw.empty:
+        raise ValueError(
+            f"date window [{args.date_start!r}, {args.date_end!r}) selected no rows"
+        )
+
     raw_value_cols = [col for col in raw.columns if col != "date"]
     clean_value_cols = [col for col in clean.columns if col != "date"]
     missing = [col for col in raw_value_cols if col not in clean_value_cols]
@@ -190,6 +214,8 @@ def main() -> None:
     clean_values = numeric_fill(clean, raw_value_cols)
     target_values = clean_values[target_cols]
     engineered_env, family_cols = build_engineered_env(clean_values, raw_value_cols, args.target_prefix, args.feature_profile)
+    raw_env_cols = [*family_cols["H"], *family_cols["seep"], *family_cols["temp"]]
+    raw_env_values = clean_values[raw_env_cols]
     time_features = build_time_features(raw["date"])
 
     mask_csv = output_dir / "dam_2h_target_observed_mask.csv"
@@ -209,12 +235,25 @@ def main() -> None:
             raw["date"],
             pd.concat([target_values, engineered_env, time_features], axis=1),
         ),
+        "dx_raw_env_nomask": write_csv(
+            output_dir / "dam_2h_saits_dx_raw_env_nomask.csv",
+            raw["date"],
+            pd.concat([target_values, raw_env_values], axis=1),
+        ),
     }
     manifest = {
         "raw_csv": str(raw_path.resolve()),
         "saits_clean_csv": str(clean_path.resolve()),
         "output_dir": str(output_dir.resolve()),
         "date_column": "date",
+        "date_window": {
+            "start_inclusive": args.date_start or None,
+            "end_exclusive": args.date_end or None,
+            "first_date": str(raw["date"].iloc[0]),
+            "last_date": str(raw["date"].iloc[-1]),
+            "input_rows": int(input_rows),
+            "selected_rows": int(len(raw)),
+        },
         "target_prefix": args.target_prefix,
         "target_columns": target_cols,
         "target_dim": len(target_cols),
@@ -223,6 +262,11 @@ def main() -> None:
         "feature_policy": "causal lagged and rolling environment aggregates plus time seasonality",
         "feature_profile": args.feature_profile,
         "family_columns": family_cols,
+        "raw_environment_columns": raw_env_cols,
+        "raw_environment_policy": (
+            "completed original H/seeP/temp sensor channels; no lag, rolling, slope, "
+            "family aggregation, or explicit calendar features"
+        ),
         "engineered_env_columns": engineered_env.columns.tolist(),
         "time_feature_columns": time_features.columns.tolist(),
         "rows": int(len(raw)),

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This dataset contains the processed input, target, and observation-mask tables
+This dataset contains the processed input, target, and missingness-mask tables
 used by the frozen DamXer forecasting experiment. It is not the complete
 289-variable source monitoring archive and does not contain coordinates,
 project names, acquisition-system identifiers, or an original-to-anonymized
@@ -26,15 +26,17 @@ versioned with that transformation.
   89 horizontal-displacement channels.
 - `inputs/dam_2h_saits_dx_engineered_env_nomask.csv`: the same 89 channels,
   followed by 79 engineered hydraulic, seepage, thermal, and time features.
+- `inputs/dam_2h_saits_dx_raw_env_nomask.csv`: the same 89 channels, followed
+  by 111 completed original hydraulic, seepage, and temperature channels.
 - `targets/filtered_response.csv`: Median(5) and Savitzky--Golay(9, 3)
   structural-response target for the same 89 channels.
 - `targets/dam_2h_filtered_response_observed_mask.csv`: target mask where `0`
-  denotes a trusted original observation and `1` denotes a missing or repaired
-  value excluded from supervised loss and metrics.
+  denotes an original observation and `1` denotes an originally missing value
+  excluded from supervised loss and metrics.
 
 ## Intended use
 
-The package supports exact reproduction and extension of the paper's processed
+The package supports reproduction and extension of the paper's processed
 forecasting protocol. It must not be interpreted as a raw sensing archive, a
 real-time causal target, or a general benchmark covering multiple dams.
 

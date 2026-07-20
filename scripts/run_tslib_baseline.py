@@ -138,6 +138,24 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 
+def resolve_device(requested, gpu):
+    if requested == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("--device cuda requested but CUDA is unavailable")
+        return torch.device(f"cuda:{gpu}")
+    if requested == "mps":
+        if not torch.backends.mps.is_available():
+            raise RuntimeError("--device mps requested but MPS is unavailable")
+        return torch.device("mps")
+    if requested == "cpu":
+        return torch.device("cpu")
+    if torch.cuda.is_available():
+        return torch.device(f"cuda:{gpu}")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def metric(pred, true):
     err = pred - true
     mse = float(np.mean(err * err))
@@ -398,7 +416,7 @@ def train_one(model_name, csv_path, run_name, args):
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
-    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(args.device, args.gpu)
     model = build_model(model_name, channels, args.seq_len, args.pred_len, args).to(device)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()
@@ -434,18 +452,25 @@ def train_one(model_name, csv_path, run_name, args):
             optim.step()
             losses.append(float(loss.item()))
         val = run_eval(model, val_loader, device, target_dim, args.label_len)
-        test = run_eval(model, test_loader, device, target_dim, args.label_len)
+        test = (
+            run_eval(model, test_loader, device, target_dim, args.label_len)
+            if args.evaluation_schedule == "per_epoch_test"
+            else None
+        )
         train_loss = float(np.mean(losses))
         val_select = val[args.selection_metric]
-        test_select = test[args.selection_metric]
         line = (
             f"{run_name} epoch={epoch} train={train_loss:.6f} "
             f"val_{args.selection_metric}_mse={val_select['mse']:.6f} "
             f"val_{args.selection_metric}_mae={val_select['mae']:.6f} "
-            f"test_{args.selection_metric}_mse={test_select['mse']:.6f} "
-            f"test_{args.selection_metric}_mae={test_select['mae']:.6f} "
-            f"time={time.time()-t0:.1f}s"
         )
+        if test is not None:
+            test_select = test[args.selection_metric]
+            line += (
+                f"test_{args.selection_metric}_mse={test_select['mse']:.6f} "
+                f"test_{args.selection_metric}_mae={test_select['mae']:.6f} "
+            )
+        line += f"time={time.time()-t0:.1f}s"
         print(line, flush=True)
         log_lines.append(line)
         step = args.step_offset + epoch
@@ -464,8 +489,9 @@ def train_one(model_name, csv_path, run_name, args):
         aexp_metric("train/loss", train_loss, step=step, epoch=epoch, **event_fields)
         aexp_metric("val/observed_mse", val["observed"]["mse"], step=step, epoch=epoch, split="val", **event_fields)
         aexp_metric("val/observed_mae", val["observed"]["mae"], step=step, epoch=epoch, split="val", **event_fields)
-        aexp_metric("test/observed_mse", test["observed"]["mse"], step=step, epoch=epoch, split="test", **event_fields)
-        aexp_metric("test/observed_mae", test["observed"]["mae"], step=step, epoch=epoch, split="test", **event_fields)
+        if test is not None:
+            aexp_metric("test/observed_mse", test["observed"]["mse"], step=step, epoch=epoch, split="test", **event_fields)
+            aexp_metric("test/observed_mae", test["observed"]["mae"], step=step, epoch=epoch, split="test", **event_fields)
         if val_select["mse"] + args.min_delta < best["val"]:
             best = {"val": val_select["mse"], "val_metrics": val, "test": test, "epoch": epoch}
             best_state = copy.deepcopy(model.state_dict())
@@ -475,12 +501,24 @@ def train_one(model_name, csv_path, run_name, args):
             if bad >= args.patience:
                 break
 
+    if best_state is None:
+        raise RuntimeError("training finished without a validation-selected model state")
+    model.load_state_dict(best_state)
+    if args.evaluation_schedule == "final_only":
+        best["val_metrics"] = run_eval(model, val_loader, device, target_dim, args.label_len)
+        best["test"] = run_eval(model, test_loader, device, target_dim, args.label_len)
+        test_select = best["test"][args.selection_metric]
+        print(
+            f"{run_name} selected_epoch={best['epoch']} "
+            f"test_{args.selection_metric}_mse={test_select['mse']:.6f} "
+            f"test_{args.selection_metric}_mae={test_select['mae']:.6f}",
+            flush=True,
+        )
+
     checkpoint_path = None
     prediction_npzs = {}
-    if best_state is not None and (args.checkpoint_dir or args.prediction_npz_dir):
-        model.load_state_dict(best_state)
 
-    if args.checkpoint_dir and best_state is not None:
+    if args.checkpoint_dir:
         checkpoint_dir = Path(args.checkpoint_dir)
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         checkpoint_path = checkpoint_dir / f"{run_name}_best.pt"
@@ -515,7 +553,7 @@ def train_one(model_name, csv_path, run_name, args):
         )
         aexp_note(f"{run_name} saved best checkpoint to {checkpoint_path}")
 
-    if args.prediction_npz_dir and best_state is not None:
+    if args.prediction_npz_dir:
         split_loaders = {"val": (val_loader, val_ds), "test": (test_loader, test_ds)}
         prediction_dir = Path(args.prediction_npz_dir)
         prediction_dir.mkdir(parents=True, exist_ok=True)
@@ -543,7 +581,21 @@ def train_one(model_name, csv_path, run_name, args):
         "date_filter": date_filter,
         "train_loss_mode": args.train_loss_mode,
         "selection_metric": args.selection_metric,
+        "evaluation_schedule": args.evaluation_schedule,
         "drop_unobserved_windows": args.drop_unobserved_windows,
+        "device": str(device),
+        "model_config": {
+            "batch_size": args.batch_size,
+            "learning_rate": args.lr,
+            "d_model": args.d_model,
+            "d_ff": args.d_ff,
+            "n_heads": args.n_heads,
+            "e_layers": args.e_layers,
+            "dropout": args.dropout,
+            "patch_len": args.patch_len,
+            "patch_stride": args.patch_stride,
+            "label_len": args.label_len,
+        },
         "seed": args.seed,
         "split_windows": {
             "train": len(train_ds),
@@ -594,12 +646,18 @@ def main():
     parser.add_argument("--patch_len", type=int, default=16)
     parser.add_argument("--patch_stride", type=int, default=8)
     parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
     parser.add_argument("--seed", type=int, default=2021)
     parser.add_argument("--tslib_root", default=None)
     parser.add_argument("--step_offset", type=int, default=0)
     parser.add_argument("--event_trial", type=int, default=-1)
     parser.add_argument("--train_loss_mode", choices=["all", "observed"], default="all")
     parser.add_argument("--selection_metric", choices=["all", "observed"], default="all")
+    parser.add_argument(
+        "--evaluation_schedule",
+        choices=["per_epoch_test", "final_only"],
+        default="final_only",
+    )
     parser.add_argument("--drop_unobserved_windows", action="store_true")
     parser.add_argument("--date_start", default="")
     parser.add_argument(
@@ -625,6 +683,7 @@ def main():
         "batch_size",
         "train_loss_mode",
         "selection_metric",
+        "evaluation_schedule",
         "drop_unobserved_windows",
         "seed",
     ):

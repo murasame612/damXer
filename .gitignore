@@ -12,6 +12,7 @@ venv/
 .env.*
 !.env.example
 .aexp*
+aexp_events.py
 .codegraph/
 
 artifacts/
@@ -33,6 +34,7 @@ external/
 
 *.csv
 !results/paper_reported_metrics.csv
+!results/paper_seed_metrics.csv
 *.parquet
 *.feather
 *.h5

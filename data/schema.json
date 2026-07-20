@@ -12,6 +12,10 @@
       "name": "dam_2h_saits_dx_engineered_env_nomask.csv",
       "columns": "date + the same ordered 89 dx channels + engineered ENV features"
     },
+    "raw_env_input": {
+      "name": "dam_2h_saits_dx_raw_env_nomask.csv",
+      "columns": "date + the same ordered 89 dx channels + 111 completed original H/seeP/temp channels"
+    },
     "target": {
       "name": "filtered_response.csv",
       "columns": "date + the same ordered 89 dx channels"
@@ -19,7 +23,7 @@
     "mask": {
       "name": "dam_2h_filtered_response_observed_mask.csv",
       "columns": "date + one <dx_channel>_masked column per target",
-      "semantics": {"0": "originally observed and trusted", "1": "missing/repaired and excluded"}
+      "semantics": {"0": "originally observed", "1": "originally missing and excluded"}
     }
   }
 }
