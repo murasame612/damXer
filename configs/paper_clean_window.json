@@ -39,7 +39,7 @@
     "n_heads": 8,
     "e_layers": 2,
     "ffn_dim": 640,
-    "dropout": 0.2,
+    "dropout": 0.25,
     "env_token_count": 60,
     "reduced_env_token_count": 15,
     "env_token_mode": "lag",
@@ -52,11 +52,12 @@
   "optimization": {
     "optimizer": "AdamW",
     "batch_size": 8,
-    "learning_rate": 0.0001327691239087578,
-    "weight_decay": 0.00014163979315531797,
+    "learning_rate": 0.0002051899795954139,
+    "weight_decay": 0.00005069785847885692,
     "gradient_clip_norm": 1.0,
     "loss": "Huber",
     "huber_delta": 0.2,
+    "smoothness_lambda": 0.01,
     "epochs": 30,
     "patience": 6,
     "min_delta": 1e-5,
@@ -64,8 +65,10 @@
     "selection_metric": "validation observed MSE"
   },
   "source_compatibility": {
-    "evaluation_schedule": "per_epoch_test",
-    "reason": "The source runs evaluated the test loader each epoch and stored the test metrics from the validation-best epoch. Test metrics did not enter model selection, but loader iteration changes the subsequent RNG stream; retaining this schedule is required to reproduce the reported seeds."
+    "evaluation_schedule": "final_only",
+    "baseline_evaluation_schedule": "per_epoch_test",
+    "baseline_evaluation_schedule_overrides": {"PatchTST": "final_only"},
+    "reason": "For the frozen Optuna-selected DamXer Trial 26 and PatchTST Trial 14 configurations, the test split is evaluated once after loading the validation-best checkpoint. The older configured baselines retain their source-run per-epoch test-loader schedule for numerical compatibility; test metrics never enter checkpoint selection."
   },
   "tslib": {
     "repository": "https://github.com/thuml/Time-Series-Library.git",
@@ -103,13 +106,36 @@
         "input_channels": 200,
         "label_len": {"default": 0}
       }
+    },
+    "search_protocol": {
+      "sampler": "Optuna TPE",
+      "sampler_seed": 2021,
+      "proposals": 30,
+      "selection_metric": "observed-only validation MSE",
+      "test_during_search": false,
+      "DamXer_selected_trial": 26,
+      "PatchTST_selected_trial": 14
+    },
+    "model_overrides": {
+      "PatchTST": {
+        "d_model": 192,
+        "d_ff": 576,
+        "n_heads": 8,
+        "e_layers": 1,
+        "learning_rate": 0.001201939966041954,
+        "dropout": 0.05,
+        "batch_size": 16,
+        "patch_len": 24,
+        "patch_stride": 4,
+        "channel_independence": 1
+      }
     }
   },
   "expected_metrics": {
-    "DamXer": {"val_mse_mean": 0.137507916103, "val_mse_std": 0.001556970209, "test_mse_mean": 0.178324743582, "test_mse_std": 0.006757590851},
-    "DamXer reduced-lag ENV": {"val_mse_mean": 0.136374329622, "val_mse_std": 0.001584522621, "test_mse_mean": 0.194600832651, "test_mse_std": 0.007206406801},
-    "DamXer displacement only": {"val_mse_mean": 0.137507264972, "val_mse_std": 0.000209558635, "test_mse_mean": 0.196716058629, "test_mse_std": 0.004310044674},
-    "PatchTST": {"val_mse_mean": 0.128556853533, "val_mse_std": 0.001315372452, "test_mse_mean": 0.194172152877, "test_mse_std": 0.004609404543},
+    "DamXer": {"val_mse_mean": 0.135669663159, "val_mse_std": 0.003470574026, "test_mse_mean": 0.179124093467, "test_mse_std": 0.006252613213},
+    "DamXer reduced-lag ENV": {"val_mse_mean": 0.133496694662, "val_mse_std": 0.003077632480, "test_mse_mean": 0.192780355588, "test_mse_std": 0.006758862274},
+    "DamXer displacement only": {"val_mse_mean": 0.138165207693, "val_mse_std": 0.001175370382, "test_mse_mean": 0.203902499186, "test_mse_std": 0.010495816129},
+    "PatchTST": {"val_mse_mean": 0.131209642508, "val_mse_std": 0.002498968937, "test_mse_mean": 0.195999668495, "test_mse_std": 0.007284551059},
     "iTransformer (dx only)": {"val_mse_mean": 0.138195684552, "val_mse_std": 0.000990507006, "test_mse_mean": 0.204762735963, "test_mse_std": 0.003854824569},
     "iTransformer+raw ENV (720)": {"val_mse_mean": 0.134338907956, "val_mse_std": 0.005065363410, "test_mse_mean": 0.263851156986, "test_mse_std": 0.023453731915},
     "DLinear": {"val_mse_mean": 0.146367561817, "val_mse_std": 0.002025845259, "test_mse_mean": 0.290825617313, "test_mse_std": 0.010514318716},

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "completion_seed": 42,
+  "data_protocol": {
+    "sampling_interval_hours": 2,
+    "rows": 10448,
+    "channels": 289,
+    "dx_channels": 89,
+    "families": {"H": 11, "seeP": 11, "dx": 89, "dy": 89, "temp": 89},
+    "canonical_raw_sha256": "65c9d34d9fbe8b15b837f0c5574986aec64bb80f9477d2e7b5967c1c057409d4",
+    "canonical_saits_clean_sha256": "af889e1bea23ece622695f915100e26565ed1824dde508170a10666489b3b35f"
+  },
+  "evaluation": {
+    "family": "dx",
+    "mask_seed": 42,
+    "reference_model_seed": 42,
+    "block_length_samples": 360,
+    "blocks_per_channel": 1,
+    "variability_model_seeds": [2021, 2022, 2023, 2024, 2025],
+    "pseudo_mask_count": 32040,
+    "paper_reference_metrics": {
+      "saits": {"MAE": 0.060399051538, "RMSE": 0.074936495561, "nRMSE_std": 0.158711451347},
+      "group_knn": {"MAE": 0.100614954231, "RMSE": 0.124934164376, "nRMSE_std": 0.233867529428},
+      "imputeformer": {"MAE": 0.352449100625, "RMSE": 0.385812809791, "nRMSE_std": 0.570056604691}
+    }
+  },
+  "models": {
+    "saits": {
+      "implementation": "pypots==1.5",
+      "sequence_length": 360,
+      "stride": 36,
+      "n_layers": 1,
+      "d_model": 64,
+      "n_heads": 4,
+      "d_k": 16,
+      "d_v": 16,
+      "d_ffn": 128,
+      "dropout": 0.0,
+      "attn_dropout": 0.0,
+      "epochs": 200,
+      "batch_size": 4,
+      "patience": null,
+      "diagonal_attention_mask": true,
+      "ORT_weight": 1,
+      "MIT_weight": 1,
+      "include_legacy_index_features": true,
+      "verbose": false
+    },
+    "imputeformer": {
+      "implementation": "pypots==1.5",
+      "sequence_length": 360,
+      "stride": 36,
+      "n_layers": 3,
+      "d_input_embed": 32,
+      "d_learnable_embed": 96,
+      "d_proj": 8,
+      "d_ffn": 256,
+      "n_temporal_heads": 4,
+      "dropout": 0.1,
+      "ORT_weight": 1.0,
+      "MIT_weight": 1.0,
+      "epochs": 20,
+      "batch_size": 4,
+      "patience": null,
+      "verbose": false
+    },
+    "group_knn": {
+      "n_neighbors": 8,
+      "max_feature_columns": 8,
+      "min_training_rows": 24,
+      "same_family_only": true,
+      "weights": "distance",
+      "n_jobs": 1
+    }
+  },
+  "source_compatibility": {
+    "legacy_index_feature_periods_samples": {"short": 24, "long": 8766},
+    "note": "The frozen source SAITS run appended seven deterministic index features. The two sinusoidal periods are 24 and 8766 samples in the historical implementation; at 2 h sampling they must not be interpreted as literal daily and annual cycles. This release preserves them for source-run compatibility rather than silently changing the reported experiment.",
+    "comparison_note": "All completion methods use the same incomplete monitoring table, evaluated dx channels, fixed pseudo-mask positions, and metrics. SAITS additionally receives seven deterministic index features preserved from the source run; ImputeFormer and Group KNN do not."
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise feature construction, target construction, and one DamXer epoch."""
+"""Exercise SAITS completion, data construction, and one DamXer epoch."""
 
 from __future__ import annotations
 
@@ -22,18 +22,33 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     output = Path(args.output_dir).resolve()
     source = output / "source"
+    completion = output / "completion"
     engineered = output / "engineered"
     target = output / "target"
     result = output / "smoke_result.json"
     python = sys.executable
 
-    run([python, str(root / "examples/generate_synthetic_data.py"), "--output-dir", str(source)])
+    run([
+        python, str(root / "examples/generate_synthetic_data.py"),
+        "--output-dir", str(source), "--rows", "400",
+    ])
+    run(
+        [
+            python,
+            str(root / "scripts/run_saits_completion.py"),
+            "--raw-csv", str(source / "raw_monitoring.csv"),
+            "--config", str(root / "configs/paper_completion.json"),
+            "--output-dir", str(completion),
+            "--device", "cpu",
+            "--epochs", "1",
+        ]
+    )
     run(
         [
             python,
             str(root / "scripts/build_engineered_inputs.py"),
             "--raw-csv", str(source / "raw_monitoring.csv"),
-            "--saits-clean-csv", str(source / "saits_clean.csv"),
+            "--saits-clean-csv", str(completion / "saits_clean.csv"),
             "--output-dir", str(engineered),
         ]
     )
@@ -42,7 +57,7 @@ def main() -> None:
             python,
             str(root / "scripts/build_filtered_response.py"),
             "--raw-csv", str(source / "raw_monitoring.csv"),
-            "--saits-clean-csv", str(source / "saits_clean.csv"),
+            "--saits-clean-csv", str(completion / "saits_clean.csv"),
             "--engineered-env-csv", str(engineered / "dam_2h_saits_dx_engineered_env_nomask.csv"),
             "--output-dir", str(target),
         ]

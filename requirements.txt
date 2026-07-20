@@ -7,3 +7,4 @@ einops>=0.8,<1
 matplotlib>=3.8,<4
 reformer-pytorch==1.4.4
 sympy>=1.12,<2
+pypots==1.5

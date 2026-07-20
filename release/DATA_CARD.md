@@ -2,11 +2,11 @@
 
 ## Scope
 
-This dataset contains the processed input, target, and missingness-mask tables
-used by the frozen DamXer forecasting experiment. It is not the complete
-289-variable source monitoring archive and does not contain coordinates,
-project names, acquisition-system identifiers, or an original-to-anonymized
-point mapping.
+This dataset contains (i) an anonymized incomplete 289-channel monitoring table
+used to train and evaluate the completion stage and (ii) the processed input,
+target, and missingness-mask tables used by the frozen DamXer forecasting
+experiment. It does not contain coordinates, project names, acquisition-system
+identifiers, or an original-to-anonymized point mapping.
 
 ## Temporal coverage
 
@@ -22,6 +22,9 @@ versioned with that transformation.
 
 ## Files
 
+- `source/anonymized_monitoring_2h_incomplete.csv`: 10448 timestamps and 289
+  anonymized H, seeP, dx, dy, and temperature channels. NaN cells encode the
+  original missingness used by the completion stage.
 - `inputs/dam_2h_saits_dx_only_nomask.csv`: continuous completed histories for
   89 horizontal-displacement channels.
 - `inputs/dam_2h_saits_dx_engineered_env_nomask.csv`: the same 89 channels,
@@ -56,6 +59,6 @@ evaluation pipeline are maintained separately at
 
 ## License and citation
 
-The applicable data license and citation are defined by the final repository
-record after data-owner approval. The source-code license does not automatically
-apply to these monitoring data.
+The applicable data license and citation will be defined by the final Mendeley
+Data record. The source-code license does not automatically apply to these
+monitoring data.

@@ -202,6 +202,7 @@ def main() -> None:
             "--weight-decay", str(optimization["weight_decay"]),
             "--loss-type", "huber",
             "--huber-delta", str(optimization["huber_delta"]),
+            "--smoothness-lambda", str(optimization["smoothness_lambda"]),
             "--predict-mode", model_config["predict_mode"],
             "--env-mode", env_mode,
             "--env-token-mode", env_token_mode,

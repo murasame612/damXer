@@ -1,8 +1,8 @@
 {
   "dataset_name": "DamXer processed forecasting benchmark",
   "version": "1.0.0",
-  "release_status": "authorized_for_post_acceptance_mendeley_release",
-  "scope": "Processed inputs, target, and missingness mask for the frozen forecasting experiment; not the complete 289-variable source archive.",
+  "release_status": "authorized_for_mendeley_deposit_after_acceptance_and_publication_upon_publication",
+  "scope": "An anonymized incomplete 289-channel monitoring table plus processed inputs, target, and missingness mask for the frozen forecasting experiment.",
   "sampling_interval_hours": 2,
   "rows": 8400,
   "date_start": "2024-01-01 00:00:00",
@@ -33,9 +33,19 @@
   },
   "files": [
     {
+      "role": "source_raw",
+      "source_name": "Dam_2h_final_values_dx_dy.csv",
+      "archive_path": "source/anonymized_monitoring_2h_incomplete.csv",
+      "rows": 10448,
+      "columns": 290,
+      "bytes": 38302858,
+      "sha256": "65c9d34d9fbe8b15b837f0c5574986aec64bb80f9477d2e7b5967c1c057409d4"
+    },
+    {
       "role": "dx_input",
       "source_name": "dam_2h_saits_dx_only_nomask.csv",
       "archive_path": "inputs/dam_2h_saits_dx_only_nomask.csv",
+      "rows": 8400,
       "columns": 90,
       "bytes": 11391683,
       "sha256": "b856a77162c33d1280e514f3fb08b8f13a36fc6acc1ffcccbb063cf3f92b4a81"
@@ -44,6 +54,7 @@
       "role": "engineered_input",
       "source_name": "dam_2h_saits_dx_engineered_env_nomask.csv",
       "archive_path": "inputs/dam_2h_saits_dx_engineered_env_nomask.csv",
+      "rows": 8400,
       "columns": 169,
       "bytes": 23568243,
       "sha256": "530f2ac80c26e4bd27fde2f7e0d68f0104536c91ffc6a8fe54faf662f4f4a898"
@@ -52,6 +63,7 @@
       "role": "raw_env_input",
       "source_name": "dam_2h_saits_dx_raw_env_nomask.csv",
       "archive_path": "inputs/dam_2h_saits_dx_raw_env_nomask.csv",
+      "rows": 8400,
       "columns": 201,
       "bytes": 18382883,
       "sha256": "44ede57a6315ea5488509f3975e646877fabd930c5cc6a2985cc387bf154d744"
@@ -60,6 +72,7 @@
       "role": "filtered_target",
       "source_name": "filtered_response.csv",
       "archive_path": "targets/filtered_response.csv",
+      "rows": 8400,
       "columns": 90,
       "bytes": 14734889,
       "sha256": "c8a3a09f7e1559d20c874b7365cb3d28850ce17ff06e113889c47a034a1fc609"
@@ -68,6 +81,7 @@
       "role": "observed_mask",
       "source_name": "dam_2h_filtered_response_observed_mask.csv",
       "archive_path": "targets/dam_2h_filtered_response_observed_mask.csv",
+      "rows": 8400,
       "columns": 90,
       "bytes": 1673365,
       "sha256": "435a508da4909ff694b5f33e1957cbc9bd12f3160c8e466836d7f68d6e93f3fd"

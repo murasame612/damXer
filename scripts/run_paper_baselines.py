@@ -108,16 +108,17 @@ def main() -> None:
             "commit_provenance": config["tslib"].get("commit_provenance"),
             "git_provenance": tslib_provenance,
         },
-        "model_config": {
-            **common,
-            "seq_len": profile["seq_len"],
-            "input_channels": profile["input_channels"],
-            "label_len": profile["label_len"],
+        "model_configs": {
+            model: {
+                **common,
+                **config["tslib"].get("model_overrides", {}).get(model, {}),
+                "seq_len": profile["seq_len"],
+                "input_channels": profile["input_channels"],
+                "label_len": profile["label_len"],
+            }
+            for model in models
         },
-        "selection": (
-            "validation observed MSE; source-compatible schedule evaluates the test loader each epoch "
-            "and reports the test metrics paired with the validation-best epoch"
-        ),
+        "selection": "validation observed MSE; test metrics never enter selection",
     }
     if args.check_only:
         print(json.dumps(protocol_manifest, indent=2))
@@ -131,6 +132,10 @@ def main() -> None:
     runner = Path(__file__).with_name("run_tslib_baseline.py")
     rows: list[dict] = []
     for model in models:
+        run_config = {**common, **config["tslib"].get("model_overrides", {}).get(model, {})}
+        evaluation_schedule = config["source_compatibility"].get(
+            "baseline_evaluation_schedule_overrides", {}
+        ).get(model, config["source_compatibility"]["baseline_evaluation_schedule"])
         label_len = int(profile["label_len"].get(model, profile["label_len"].get("default", 0)))
         for seed in seeds:
             run_dir = output_dir / model / f"seed_{seed}"
@@ -149,26 +154,27 @@ def main() -> None:
                 "--variants", profile["input_file"],
                 "--seq_len", str(profile["seq_len"]),
                 "--label_len", str(label_len),
-                "--pred_len", str(common["pred_len"]),
-                "--target_dim", str(common["target_dim"]),
-                "--epochs", str(common["epochs"]),
-                "--patience", str(common["patience"]),
-                "--batch_size", str(common["batch_size"]),
+                "--pred_len", str(run_config["pred_len"]),
+                "--target_dim", str(run_config["target_dim"]),
+                "--epochs", str(run_config["epochs"]),
+                "--patience", str(run_config["patience"]),
+                "--batch_size", str(run_config["batch_size"]),
                 "--num_workers", str(args.num_workers),
-                "--lr", str(common["learning_rate"]),
-                "--d_model", str(common["d_model"]),
-                "--d_ff", str(common["d_ff"]),
-                "--n_heads", str(common["n_heads"]),
-                "--e_layers", str(common["e_layers"]),
-                "--dropout", str(common["dropout"]),
-                "--patch_len", str(common["patch_len"]),
-                "--patch_stride", str(common["patch_stride"]),
+                "--lr", str(run_config["learning_rate"]),
+                "--d_model", str(run_config["d_model"]),
+                "--d_ff", str(run_config["d_ff"]),
+                "--n_heads", str(run_config["n_heads"]),
+                "--e_layers", str(run_config["e_layers"]),
+                "--dropout", str(run_config["dropout"]),
+                "--patch_len", str(run_config["patch_len"]),
+                "--patch_stride", str(run_config["patch_stride"]),
+                "--channel_independence", str(run_config.get("channel_independence", 1)),
                 "--gpu", str(args.gpu),
                 "--device", args.device,
                 "--seed", str(seed),
-                "--train_loss_mode", common["train_loss_mode"],
-                "--selection_metric", common["selection_metric"],
-                "--evaluation_schedule", config["source_compatibility"]["evaluation_schedule"],
+                "--train_loss_mode", run_config["train_loss_mode"],
+                "--selection_metric", run_config["selection_metric"],
+                "--evaluation_schedule", evaluation_schedule,
                 "--drop_unobserved_windows",
             ]
             if args.keep_predictions:

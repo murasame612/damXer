@@ -16,15 +16,20 @@ experiment pipeline. The real dam-monitoring data are not committed here.
 Without the paper dataset, third parties can inspect the method and execute the
 synthetic smoke test, but cannot reproduce the paper's numerical results.
 
-The processed benchmark will be deposited in Mendeley Data after manuscript
-acceptance under the available data-owner authorization. No monitoring data
-have been uploaded as part of this code-finalization work. See
+The data owner has authorized publication of the anonymized monitoring dataset
+and processed forecasting benchmark. The Mendeley Data draft will be prepared
+after manuscript acceptance and made publicly available upon publication. No
+monitoring data have been uploaded as part of this code-finalization work. See
 [release/README.md](release/README.md) for the local validation contract.
 
 ## What is included
 
 ```text
 configs/paper_clean_window.json       frozen five-seed paper configuration
+configs/paper_completion.json         frozen SAITS/completion configuration
+scripts/run_saits_completion.py       incomplete table -> SAITS clean table
+scripts/run_completion_benchmark.py   fixed-block SAITS/KNN/ImputeFormer comparison
+scripts/verify_completion_results.py  completion protocol and metric checks
 scripts/build_engineered_inputs.py    hydraulic/seepage/thermal lag features
 scripts/build_filtered_response.py    Median(5) + Savitzky--Golay(9, 3) target
 scripts/train_damxer.py                model, observed-only loss, training, evaluation
@@ -33,6 +38,7 @@ scripts/run_paper_baselines.py         frozen generic/raw-ENV baseline runner
 scripts/run_tslib_baseline.py          optional Time-Series-Library adapter
 scripts/run_tslib_baselines.sh         optional baseline batch wrapper
 scripts/verify_paper_results.py        seed aggregation and paper-number checks
+scripts/prepare_data_release.py        local Mendeley staging and SHA verification
 data/README.md                         required input schema and mask semantics
 examples/                              synthetic data and end-to-end smoke test
 tests/                                 unit tests for masking and lag-token construction
@@ -68,8 +74,10 @@ interchangeable with the reported CUDA runs.
 ## Synthetic smoke test
 
 The synthetic example contains generic channel names and no project data. It
-checks input construction, filtered-response target construction, the original
-mask convention, the 60-token environment bank, and one DamXer training epoch.
+trains a one-epoch CPU SAITS smoke model, then checks input construction,
+filtered-response target construction, the original mask convention, the
+60-token environment bank, and one DamXer training epoch. It is an execution
+test, not a paper-grade result.
 
 ```bash
 python examples/run_synthetic_smoke.py
@@ -184,32 +192,70 @@ python scripts/run_paper_baselines.py \
   --device cuda
 ```
 
-The frozen configuration uses seeds 2021--2025, displacement/environmental
-histories of 192/720 steps, a 96-step horizon, 16/16 patch length and stride,
-hidden size 160, 8 heads, 2 layers, observed-only Huber loss, RevIN, and direct
-prediction. Model-state selection uses validation observed MSE. To reproduce
-the reported source runs, the frozen runner retains their per-epoch test-loader
-schedule and reports the test metrics paired with the validation-best epoch.
-The test metrics never enter selection, but iterating the loader changes the
-subsequent random-number stream; therefore this behavior is explicit in the
-configuration instead of being silently altered. Standalone trainers default
-to the cleaner `final_only` schedule.
+The frozen DamXer Trial 26 configuration uses seeds 2021--2025,
+displacement/environmental histories of 192/720 steps, a 96-step horizon,
+16/16 patch length and stride, hidden size 160, 8 heads, 2 layers, dropout 0.25,
+observed-only Huber loss plus a 0.01 increment-loss weight, RevIN, and direct
+prediction. Model-state selection uses validation observed MSE and the test
+split is evaluated once after loading the selected checkpoint. PatchTST Trial
+14 follows the same final-only rule. The older configured baselines retain
+their source-run per-epoch test-loader schedule only for numerical compatibility;
+test metrics never enter selection in either schedule.
 
-## Prepare compatible inputs
+## Reproduce completion and prepare forecasting inputs
 
-Given an incomplete raw table and an already completed continuous table:
+Start from the anonymized incomplete monitoring table. The formal command uses
+the frozen 200-epoch PyPOTS SAITS configuration and writes a continuous table:
 
 ```bash
+python scripts/run_saits_completion.py \
+  --raw-csv /path/to/anonymized_monitoring_2h_incomplete.csv \
+  --config configs/paper_completion.json \
+  --output-dir artifacts/completion/canonical \
+  --device cuda \
+  --strict-paper-shape
+```
+
+The historical source run appended seven deterministic sample-index features
+to SAITS. Their periods (24 and 8766 samples) are preserved exactly for source
+compatibility; at 2 h sampling they are not claimed to be literal daily or
+annual cycles. ImputeFormer and Group KNN do not receive those features.
+
+Reproduce the paper-facing continuous-block comparison on the same monitoring
+table, dx channels, pseudo-mask positions, and metrics:
+
+```bash
+python scripts/run_completion_benchmark.py \
+  --raw-csv /path/to/anonymized_monitoring_2h_incomplete.csv \
+  --config configs/paper_completion.json \
+  --output-dir artifacts/completion/benchmark \
+  --models saits,group_knn,imputeformer \
+  --seeds 42 \
+  --device cuda \
+  --strict-paper-shape
+
+python scripts/verify_completion_results.py \
+  --summary artifacts/completion/benchmark/summary.json
+```
+
+Seed 42 reproduces the paper table. For the five training runs used to draw
+the figure variability bands, pass `--seeds 2021,2022,2023,2024,2025`.
+
+Then construct the frozen forecasting inputs and target:
+
+```bash
+SAITS_CLEAN=artifacts/completion/canonical/saits_clean.csv
+
 python scripts/build_engineered_inputs.py \
   --raw-csv /path/to/raw_monitoring.csv \
-  --saits-clean-csv /path/to/saits_clean.csv \
+  --saits-clean-csv "$SAITS_CLEAN" \
   --output-dir artifacts/engineered \
   --date-start '2024-01-01 00:00:00' \
   --date-end '2025-12-01 00:00:00'
 
 python scripts/build_filtered_response.py \
   --raw-csv /path/to/raw_monitoring.csv \
-  --saits-clean-csv /path/to/saits_clean.csv \
+  --saits-clean-csv "$SAITS_CLEAN" \
   --output-dir artifacts/filtered-response \
   --date-start '2024-01-01 00:00:00' \
   --date-end '2025-12-01 00:00:00'
@@ -238,8 +284,9 @@ containing five `seed_*.json` files. It requires the frozen seeds 2021--2025
 and uses sample standard deviation, matching the manuscript table.
 
 SAITS is an adopted completion component rather than the paper's proposed
-forecasting model. The current release accepts a SAITS-completed table as an
-input and does not redistribute the project-specific completion dataset.
+forecasting model. The Mendeley contract includes the anonymized incomplete
+monitoring table needed to rerun completion and the five processed forecasting
+tables needed to rerun DamXer.
 
 ## Scope and claims
 

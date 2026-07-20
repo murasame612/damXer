@@ -1,5 +1,9 @@
 # Data interface
 
+The Mendeley release has two layers: the anonymized incomplete monitoring table
+used by the completion stage and the five frozen processed forecasting tables.
+See [`release/README.md`](../release/README.md) for staging and hash checks.
+
 The real dam-monitoring dataset is not included in this code repository. Data
 availability is documented separately in the associated manuscript. The
 synthetic example verifies that the software pipeline executes; it cannot
