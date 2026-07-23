@@ -4,23 +4,65 @@ DamXer is a response-guided environmental lag-attention model for direct,
 multi-step, multi-point earth-rockfill dam displacement forecasting under
 incomplete monitoring.
 
-This repository contains the paper-facing model implementation and executable
-experiment pipeline. It is intentionally separate from the internal research
-workspace so that datasets, operational identifiers, model artifacts, server
-paths, and exploratory experiments are not published accidentally.
+This repository contains the paper-facing model implementation, frozen
+configurations, anonymized paper data, and executable experiment pipeline.
 
 ## Release status
 
-This is the public code release for the DamXer method and reproducible
-experiment pipeline. The real dam-monitoring data are not committed here.
-Without the paper dataset, third parties can inspect the method and execute the
-synthetic smoke test, but cannot reproduce the paper's numerical results.
-
 The data owner has authorized publication of the anonymized monitoring dataset
-and processed forecasting benchmark. The Mendeley Data draft will be prepared
-after manuscript acceptance and made publicly available upon publication. No
-monitoring data have been uploaded as part of this code-finalization work. See
-[release/README.md](release/README.md) for the local validation contract.
+and processed forecasting benchmark. The canonical files are under
+[`data/paper/`](data/paper/) and are protected by byte-size, shape, and SHA-256
+checks in [`release/benchmark_manifest.json`](release/benchmark_manifest.json).
+
+## Quick start
+
+From a fresh clone, this command validates all six released CSV files and
+recomputes every paper-table mean and sample standard deviation from the
+published 45-row seed ledger:
+
+```bash
+./reproduce.sh
+```
+
+It uses only the Python standard library and writes
+`artifacts/reproduction/check_report.json`. This fast check does not retrain a
+model. For a genuine CUDA rerun of the three DamXer variants (15 training jobs),
+use:
+
+```bash
+./reproduce.sh damxer --device cuda
+```
+
+For all nine paper settings (45 jobs), including automatic checkout of the
+frozen Time-Series-Library adapter dependency, use:
+
+```bash
+./reproduce.sh paper --device cuda
+```
+
+The first training command creates a project-local `.venv` and installs
+`requirements-forecasting.txt`; it never installs into the system Python. The
+full `requirements.txt` additionally includes PyPOTS for rerunning SAITS. A guided version
+of the same workflow is available in
+[`notebooks/DamXer_reproduction.ipynb`](notebooks/DamXer_reproduction.ipynb).
+
+## CUDA reproduction check
+
+The public-repository entry point was executed on an NVIDIA RTX PRO 6000
+Blackwell workstation on 2026-07-23 using PyTorch 2.11.0+cu128. All 15 DamXer
+jobs completed successfully, and the three five-seed test-MSE aggregates
+matched the frozen numerical ledger at stored precision:
+
+| Variant | Active ENV tokens | Test MSE (mean +/- sample SD) |
+|---|---:|---:|
+| DamXer | 60 | 0.179124 +/- 0.006253 |
+| Reduced-lag ENV | 15 | 0.192780 +/- 0.006759 |
+| Displacement only | 0 | 0.203902 +/- 0.010496 |
+
+The machine-readable execution receipt is
+[`release/reproduction_pro6000_20260723.json`](release/reproduction_pro6000_20260723.json).
+It records a release-candidate run; immutable release provenance begins with
+the eventual repository commit and tag.
 
 ## What is included
 
@@ -38,7 +80,11 @@ scripts/run_paper_baselines.py         frozen generic/raw-ENV baseline runner
 scripts/run_tslib_baseline.py          optional Time-Series-Library adapter
 scripts/run_tslib_baselines.sh         optional baseline batch wrapper
 scripts/verify_paper_results.py        seed aggregation and paper-number checks
-scripts/prepare_data_release.py        local Mendeley staging and SHA verification
+scripts/reproduce.py                   unified data-check and retraining entry point
+scripts/prepare_data_release.py        canonical GitHub data assembly and SHA checks
+reproduce.sh                           one-command wrapper and local environment setup
+notebooks/DamXer_reproduction.ipynb    guided check and optional retraining workflow
+data/paper/                            canonical anonymized paper dataset
 data/README.md                         required input schema and mask semantics
 examples/                              synthetic data and end-to-end smoke test
 tests/                                 unit tests for masking and lag-token construction
@@ -122,12 +168,13 @@ origins.
 
 ## Reproduce the frozen five-seed run
 
-Set the private local paths once:
+The one-command wrapper uses the included canonical paths. The equivalent
+manual variables are:
 
 ```bash
-DATA_ROOT=/path/to/engineered-inputs
-TARGET_CSV=/path/to/filtered-response/filtered_response.csv
-MASK_CSV=/path/to/filtered-response/dam_2h_filtered_response_observed_mask.csv
+DATA_ROOT=data/paper/inputs
+TARGET_CSV=data/paper/targets/filtered_response.csv
+MASK_CSV=data/paper/targets/dam_2h_filtered_response_observed_mask.csv
 ```
 
 ```bash
@@ -284,7 +331,7 @@ containing five `seed_*.json` files. It requires the frozen seeds 2021--2025
 and uses sample standard deviation, matching the manuscript table.
 
 SAITS is an adopted completion component rather than the paper's proposed
-forecasting model. The Mendeley contract includes the anonymized incomplete
+forecasting model. The GitHub data release includes the anonymized incomplete
 monitoring table needed to rerun completion and the five processed forecasting
 tables needed to rerun DamXer.
 
@@ -292,14 +339,23 @@ tables needed to rerun DamXer.
 
 - The synthetic smoke test demonstrates software executability, not paper-grade
   accuracy.
-- The reported metrics in `results/` are manuscript values, not results
-  regenerated from public data in this repository.
+- The fast check reaggregates published seed-level values; only `damxer` or
+  `paper` mode performs fresh training on the released data.
+- The exact source package build was not preserved. A fresh five-seed GPU run
+  is therefore checked with the declared aggregate MSE tolerance (default
+  `0.005`), not by requiring bitwise identity across CUDA hardware and releases.
 - Attention weights indicate model relevance and are not causal estimates of
   physical lag.
 
 ## License and citation
 
 The source code, configurations, documentation, and synthetic examples are
-released under the [MIT License](LICENSE). The MIT License does not grant any
-rights to operational monitoring data, which remain governed separately by the
-data owner. Citation metadata are provided in [CITATION.cff](CITATION.cff).
+released under the [MIT License](LICENSE).
+
+The authorized anonymized monitoring data and processed benchmark files under
+`data/paper/` are released under the
+[Creative Commons Attribution 4.0 International License](data/paper/LICENSE).
+CC BY 4.0 permits sharing and adaptation, including commercial use, provided
+that appropriate attribution is given, the license is linked, and changes are
+indicated. Citation metadata are provided in
+[CITATION.cff](CITATION.cff).

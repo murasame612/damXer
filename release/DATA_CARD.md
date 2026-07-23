@@ -11,8 +11,10 @@ identifiers, or an original-to-anonymized point mapping.
 ## Temporal coverage
 
 - Sampling interval: 2 h
-- Number of timestamps: 8400
-- Window: 2024-01-01 00:00 through 2025-11-30 22:00
+- Authorized incomplete source table: 10448 timestamps from
+  2024-01-01 00:00 through 2026-05-20 14:00
+- Forecasting benchmark: 8400 timestamps from
+  2024-01-01 00:00 through 2025-11-30 22:00
 - Split: chronological 70/10/20
 
 Calendar timestamps and point-label policy must match the data-owner approval
@@ -53,12 +55,17 @@ details, or combine the trajectories with external sources for site discovery.
 
 ## Code
 
-The model, frozen configuration, schema, synthetic verification example, and
-evaluation pipeline are maintained separately at
+The model, frozen configuration, schema, synthetic verification example,
+evaluation pipeline, and canonical data files are maintained together at
 `https://github.com/murasame612/damXer`.
 
 ## License and citation
 
-The applicable data license and citation will be defined by the final Mendeley
-Data record. The source-code license does not automatically apply to these
-monitoring data.
+The authorized anonymized monitoring data and processed benchmark files under
+`data/paper/**` are licensed under the
+[Creative Commons Attribution 4.0 International License](../data/paper/LICENSE).
+The license permits sharing and adaptation for any purpose, including
+commercial use, provided that appropriate credit is given, the license is
+linked, and changes are indicated. Source code, configurations, and
+documentation remain under the repository's MIT License. Cite the accompanying
+DamXer paper when using this benchmark.

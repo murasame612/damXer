@@ -28,6 +28,8 @@ tensorboard/
 data/*
 !data/README.md
 !data/schema.json
+!data/paper/
+!data/paper/**
 dataset/
 paper_workspace/
 external/
@@ -50,8 +52,15 @@ external/
 *.sqlite*
 *.log
 
-# Local data-release staging. Real monitoring data and upload archives must
-# never be committed to the code repository.
+# These are the approved canonical paper CSVs; keep this exception below the
+# global generated-CSV rule so Git actually tracks them.
+!data/paper/**/*.csv
+data/paper/staging_receipt.json
+
+# Local data-release staging and archive bundles remain untracked. The
+# canonical paper tables under data/paper/ are the only committed data files.
 release/staging/
 release/*.zip
 release/*.tar.gz
+
+notebooks/.ipynb_checkpoints/

@@ -1,0 +1,53 @@
+{
+  "date": "2026-07-23",
+  "purpose": "Independent execution of the public-repository DamXer entry point on a CUDA workstation",
+  "status": "succeeded",
+  "exit_code": 0,
+  "hardware": {
+    "gpu_index": 0,
+    "accelerator_family": "NVIDIA RTX PRO 6000 Blackwell"
+  },
+  "runtime": {
+    "python": "3.10.20",
+    "numpy": "1.26.4",
+    "pandas": "2.3.3",
+    "torch": "2.11.0+cu128",
+    "platform": "Linux-6.8.0-111-generic-x86_64-with-glibc2.35"
+  },
+  "command": "python scripts/reproduce.py --mode damxer --device cuda --seeds 2021,2022,2023,2024,2025 --allow-dirty-code",
+  "config_sha256": "7c937171d7deea13ab837acab3d38e02af011d12497b405b97316761ae6a90a2",
+  "protocol": {
+    "timestamps": 8400,
+    "target_channels": 89,
+    "displacement_history_steps": 192,
+    "environment_history_steps": 720,
+    "forecast_steps": 96,
+    "seeds": [2021, 2022, 2023, 2024, 2025]
+  },
+  "results": {
+    "full": {
+      "active_env_token_count": 60,
+      "test_mse_mean": 0.1791240934665331,
+      "test_mse_sample_std": 0.00625261321341018,
+      "summary_sha256": "69d640e89b2531df4f6d236839336a6801d91dd0b78c1e2a9cfe64693fd2e58e"
+    },
+    "reduced_lag": {
+      "active_env_token_count": 15,
+      "test_mse_mean": 0.19278035558836945,
+      "test_mse_sample_std": 0.006758862273880317,
+      "summary_sha256": "bbd8de593a32178abcb90881e32230086ce7e02d24b3ed4772581f9b7d7bfb62"
+    },
+    "displacement_only": {
+      "active_env_token_count": 0,
+      "test_mse_mean": 0.20390249918588116,
+      "test_mse_sample_std": 0.010495816129108406,
+      "summary_sha256": "983510d98f19899b225efe119cbcecc7994145c13df67d40aed6fe9e6a705766"
+    }
+  },
+  "acceptance": {
+    "aggregate_absolute_tolerance": 0.005,
+    "outcome": "pass",
+    "note": "All three aggregates exactly match the frozen five-seed ledger at stored precision."
+  },
+  "provenance_boundary": "The run used the uncommitted public-release candidate synchronized to the workstation; formal immutable release provenance begins after the repository commit and tag."
+}

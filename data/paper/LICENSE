@@ -1,0 +1,25 @@
+# DamXer Paper Data License
+
+Except where otherwise noted, all files under `data/paper/` are licensed under
+the Creative Commons Attribution 4.0 International License (CC BY 4.0).
+
+Canonical license:
+https://creativecommons.org/licenses/by/4.0/
+
+Legal code:
+https://creativecommons.org/licenses/by/4.0/legalcode
+
+You may share and adapt these data for any purpose, including commercial use,
+provided that you give appropriate credit, link to the license, and indicate
+whether changes were made.
+
+For attribution, please cite the accompanying DamXer paper and identify the
+dataset as:
+
+DamXer processed forecasting benchmark, version 1.0.0,
+https://github.com/murasame612/damXer
+
+This data license does not apply to source code, configurations, documentation,
+or synthetic examples, which remain under the repository's MIT License. It also
+does not cover excluded site identifiers, original-to-anonymized mappings,
+owner documents, or any other materials not contained in `data/paper/`.
