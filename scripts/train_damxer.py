@@ -857,7 +857,7 @@ def collect_lag_sensitivity(model, loaders, device, args, spec_text: str) -> dic
     return {"mask_value": "standardized_zero_train_mean", "results": results}
 
 
-def collect_attention_summary(model, loader, device):
+def collect_attention_summary(model, loader, device, use_revin: bool, revin_eps: float):
     model.eval()
     acc = None
     total = 0
@@ -865,7 +865,14 @@ def collect_attention_summary(model, loader, device):
         for x_dx, x_env, *_ in loader:
             x_dx = x_dx.float().to(device)
             x_env = x_env.float().to(device)
-            _ = model(x_dx, x_env)
+            if use_revin:
+                mean = x_dx.mean(dim=1, keepdim=True).detach()
+                var = torch.var(x_dx, dim=1, keepdim=True, unbiased=False)
+                stdev = torch.sqrt(var + revin_eps).detach()
+                model_input = (x_dx - mean) / stdev
+            else:
+                model_input = x_dx
+            _ = model(model_input, x_env)
             weights = model.last_attn_mean
             if weights is None:
                 continue
@@ -1239,7 +1246,7 @@ def main():
     if args.evaluation_schedule == "final_only":
         best["val_metrics"] = run_eval(model, loaders["val"], device, args.predict_mode, args.revin, args.revin_eps)
         best["test_metrics"] = run_eval(model, loaders["test"], device, args.predict_mode, args.revin, args.revin_eps)
-    attention_summary = collect_attention_summary(model, loaders["val"], device)
+    attention_summary = collect_attention_summary(model, loaders["val"], device, args.revin, args.revin_eps)
     sensitivity = collect_lag_sensitivity(model, loaders, device, args, args.sensitivity_specs) if args.sensitivity_specs else None
     prediction_npz = None
     prediction_npzs = {}

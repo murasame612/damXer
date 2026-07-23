@@ -1,13 +1,13 @@
 # Data interface
 
-The Mendeley release has two layers: the anonymized incomplete monitoring table
+The GitHub release has two layers: the anonymized incomplete monitoring table
 used by the completion stage and the five frozen processed forecasting tables.
-See [`release/README.md`](../release/README.md) for staging and hash checks.
+They are stored under `paper/source`, `paper/inputs`, and `paper/targets`. See
+[`release/README.md`](../release/README.md) for assembly and hash checks.
 
-The real dam-monitoring dataset is not included in this code repository. Data
-availability is documented separately in the associated manuscript. The
-synthetic example verifies that the software pipeline executes; it cannot
-reproduce the numerical results reported in the paper.
+Files under `paper/` are licensed under
+[CC BY 4.0](paper/LICENSE). The repository source code, configurations, and
+documentation remain under the root MIT License.
 
 ## Paper input files
 

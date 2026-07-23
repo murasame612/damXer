@@ -4,13 +4,17 @@ title: "DamXer: Response-guided environmental lag attention for multi-point dam 
 type: software
 authors:
   - family-names: "Zhu"
-    given-names: "Song"
+    given-names: "Jiasong"
   - family-names: "Chen"
-    given-names: "HongWen"
+    given-names: "Hongwen"
+  - family-names: "Zhu"
+    given-names: "Song"
+  - family-names: "Li"
+    given-names: "Lihui"
   - family-names: "Teng"
     given-names: "Siyu"
     email: "siyuteng@szu.edu.cn"
 repository-code: "https://github.com/murasame612/damXer"
 license: MIT
 version: 1.0.0
-date-released: 2026-07-20
+date-released: 2026-07-23

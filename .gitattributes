@@ -1,0 +1,2 @@
+# Preserve the canonical release bytes across clone/checkouts on all platforms.
+data/paper/**/*.csv -text -diff

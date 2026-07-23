@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Assemble and verify a local Mendeley Data staging directory; never upload it."""
+"""Assemble and verify the canonical GitHub paper-data directory; never upload it."""
 
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
 import json
 import shutil
 from pathlib import Path
 
-import pandas as pd
 
-from paper_protocol import sha256_file
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def main() -> None:
@@ -49,9 +55,10 @@ def main() -> None:
         actual_hash = sha256_file(source)
         if source.stat().st_size != int(item["bytes"]) or actual_hash != item["sha256"]:
             raise ValueError(f"manifest mismatch for {role}: {source}")
-        frame = pd.read_csv(source, nrows=1)
-        if len(frame.columns) != int(item["columns"]):
-            raise ValueError(f"column-count mismatch for {role}: {len(frame.columns)}")
+        with source.open(newline="", encoding="utf-8-sig") as handle:
+            columns = len(next(csv.reader(handle)))
+        if columns != int(item["columns"]):
+            raise ValueError(f"column-count mismatch for {role}: {columns}")
         row_count = sum(1 for _ in source.open("rb")) - 1
         if row_count != int(item["rows"]):
             raise ValueError(f"row-count mismatch for {role}: {row_count}")
@@ -71,7 +78,7 @@ def main() -> None:
         "status": "verified",
         "check_only": args.check_only,
         "upload_performed": False,
-        "platform": "Mendeley Data",
+        "platform": "GitHub repository",
         "release_status": manifest["release_status"],
         "source_manifest": str(manifest_path),
         "files": records,

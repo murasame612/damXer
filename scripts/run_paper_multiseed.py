@@ -171,6 +171,7 @@ def main() -> None:
     patience = args.patience if args.patience is not None else int(optimization["patience"])
     train_script = Path(__file__).with_name("train_damxer.py")
     rows = []
+    active_env_token_count = None
     for seed in seeds:
         result_path = seed_dir / f"seed_{seed}.json"
         log_path = log_dir / f"seed_{seed}.log"
@@ -226,6 +227,14 @@ def main() -> None:
         if process.returncode != 0:
             raise subprocess.CalledProcessError(process.returncode, command)
         payload = json.loads(result_path.read_text(encoding="utf-8"))
+        seed_token_count = len(payload.get("lag_tokens", [])) if env_mode != "none" else 0
+        if active_env_token_count is None:
+            active_env_token_count = seed_token_count
+        elif active_env_token_count != seed_token_count:
+            raise ValueError(
+                "active environmental token count changed across seeds: "
+                f"{active_env_token_count} != {seed_token_count}"
+            )
         rows.append(
             {
                 "seed": seed,
@@ -250,9 +259,16 @@ def main() -> None:
         "config": {"path": str(config_path), "sha256": sha256_file(config_path)},
         "code_provenance": code_provenance,
         "runtime": runtime_versions(),
+        "model": {
+            "variant": args.variant,
+            "env_mode": env_mode,
+            "env_token_mode": env_token_mode,
+            "active_env_token_count": active_env_token_count,
+        },
         "selection": (
-            "validation observed MSE; source-compatible schedule evaluates the test loader each epoch "
-            "and reports the test metrics paired with the validation-best epoch"
+            "validation observed MSE; test evaluated once after loading the validation-best checkpoint"
+            if config["source_compatibility"]["evaluation_schedule"] == "final_only"
+            else "validation observed MSE; source-compatible per-epoch test loading without test-based selection"
         ),
         "protocol": protocol,
         "seeds": seeds,

@@ -1,0 +1,9 @@
+numpy>=1.26,<3
+pandas>=2.2,<4
+scipy>=1.12,<2
+scikit-learn>=1.4,<2
+torch>=2.4,<3
+einops>=0.8,<1
+matplotlib>=3.8,<4
+reformer-pytorch==1.4.4
+sympy>=1.12,<2
